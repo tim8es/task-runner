@@ -1,0 +1,13 @@
+name: Runner check
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check environment
+        run: ffmpeg -version | head -n 1
