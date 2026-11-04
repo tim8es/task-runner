@@ -2,6 +2,12 @@ name: Runner test
 
 on:
   workflow_dispatch:
+    inputs:
+      checkout_only:
+        description: Only check out the private renderer
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -11,6 +17,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check Altare reachability
+        if: ${{ !inputs.checkout_only }}
         run: |
           status="$(curl --silent --output /dev/null --write-out '%{http_code}' --connect-timeout 5 --max-time 10 --location https://n8n-altare.taile7cc1a.ts.net/ 2>/dev/null || true)"
           printf 'n8n_http_status=%s\n' "${status:-000}"
@@ -26,6 +33,7 @@ jobs:
           show-progress: false
 
       - name: Run synthetic render check
+        if: ${{ !inputs.checkout_only }}
         env:
           OMNIROUTE_BASE_URL: https://subscript-dexterity-mutiny.ngrok-free.dev/v1
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
