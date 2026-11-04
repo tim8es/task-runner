@@ -22,6 +22,7 @@ jobs:
 
       - name: Run synthetic render check
         env:
+          OMNIROUTE_BASE_URL: https://subscript-dexterity-mutiny.ngrok-free.dev/v1
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: bash task/scripts/ci_render_probe.sh
