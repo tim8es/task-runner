@@ -10,20 +10,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: Get private test
+      - name: Get private renderer
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: ${{ secrets.PRIVATE_REPO }}
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          ref: pilot/github-render-test
+          ref: codex/shorts-github-cloud-migration
           path: task
           persist-credentials: false
           show-progress: false
 
-      - name: Run test
+      - name: Run synthetic render check
         env:
-          PREVIEW_UPLOAD_TOKEN: ${{ secrets.PREVIEW_UPLOAD_TOKEN }}
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: bash task/scripts/ci_render_probe.sh
-
