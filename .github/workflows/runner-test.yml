@@ -18,8 +18,8 @@ jobs:
       - name: Get private renderer
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          repository: ${{ secrets.PRIVATE_REPO }}
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          repository: tim8es/n8n-youtube-shorts-workflow
+          ssh-key: ${{ secrets.PRIVATE_REPO_DEPLOY_KEY }}
           ref: codex/shorts-github-cloud-migration
           path: task
           persist-credentials: false
