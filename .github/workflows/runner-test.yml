@@ -21,4 +21,7 @@ jobs:
           show-progress: false
 
       - name: Run test
+        env:
+          PREVIEW_UPLOAD_TOKEN: ${{ secrets.PREVIEW_UPLOAD_TOKEN }}
         run: bash task/scripts/ci_render_probe.sh
+
