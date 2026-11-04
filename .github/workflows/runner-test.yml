@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
+      - name: Check Altare reachability
+        run: |
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' --connect-timeout 5 --max-time 10 --location https://n8n-altare.taile7cc1a.ts.net/ 2>/dev/null || true)"
+          printf 'n8n_http_status=%s\n' "${status:-000}"
+
       - name: Get private renderer
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -19,11 +24,6 @@ jobs:
           path: task
           persist-credentials: false
           show-progress: false
-
-      - name: Check Altare reachability
-        run: |
-          status="$(curl --silent --output /dev/null --write-out '%{http_code}' --connect-timeout 5 --max-time 10 --location https://n8n-altare.taile7cc1a.ts.net/ 2>/dev/null || true)"
-          printf 'n8n_http_status=%s\n' "${status:-000}"
 
       - name: Run synthetic render check
         env:
