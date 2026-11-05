@@ -26,11 +26,57 @@ jobs:
           show-progress: false
 
       - name: Install renderer dependencies
+        id: install_renderer_dependencies
+        timeout-minutes: 5
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg python3-venv fonts-dejavu-core
+          sudo apt-get -o Acquire::http::Timeout=45 -o Acquire::https::Timeout=45 -o Acquire::Retries=1 update -qq
+          sudo apt-get -o Acquire::http::Timeout=45 -o Acquire::https::Timeout=45 -o Acquire::Retries=1 install -y -qq ffmpeg python3-venv fonts-dejavu-core
           python3 -m venv "$RUNNER_TEMP/shorts-venv"
           "$RUNNER_TEMP/shorts-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir 'Pillow==13.0.0' 'edge-tts==7.3.1'
+
+      - name: Report renderer setup failure to n8n
+        if: ${{ always() && steps.install_renderer_dependencies.outcome != 'success' }}
+        timeout-minutes: 2
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          N8N_RENDER_CALLBACK_URL: https://n8n-altare.taile7cc1a.ts.net/webhook/shorts-render-callback
+          N8N_RENDER_TOKEN: ${{ secrets.PREVIEW_UPLOAD_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.request
+
+          payload = json.dumps({
+              "schemaVersion": 1,
+              "jobId": os.environ["JOB_ID"],
+              "status": "failed",
+              "stage": "render",
+              "errorType": "RunnerSetupFailed",
+          }).encode("utf-8")
+          for attempt in range(3):
+              request = urllib.request.Request(
+                  os.environ["N8N_RENDER_CALLBACK_URL"],
+                  data=payload,
+                  headers={
+                      "Content-Type": "application/json",
+                      "X-Job-ID": os.environ["JOB_ID"],
+                      "X-Preview-Token": os.environ["N8N_RENDER_TOKEN"],
+                  },
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      if response.status != 200:
+                          raise RuntimeError("setup_failure_callback_not_accepted")
+                      print(json.dumps({"status": "reported", "httpStatus": response.status}))
+                      break
+              except Exception:
+                  if attempt == 2:
+                      raise
+                  time.sleep(2)
+          PY
 
       - name: Render and return the result to n8n
         working-directory: task
