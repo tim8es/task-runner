@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: tim8es/n8n-youtube-shorts-workflow
-          ref: a01b881e7ca87c554406477657e4598c0e312f32
+          ref: 84917e2b7c6f314cd2afe5bcae246f5b64ae9711
           ssh-key: ${{ secrets.PRIVATE_REPO_DEPLOY_KEY }}
           path: task
           persist-credentials: false
