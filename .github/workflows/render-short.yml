@@ -88,5 +88,7 @@ jobs:
           OMNIROUTE_BASE_URL: https://subscript-dexterity-mutiny.ngrok-free.dev/v1
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          VISUAL_REVIEW_MODEL: fast
+          VISUAL_REVIEW_FALLBACK_MODELS: ollama-cloud/gemma4:31b
         run: "$RUNNER_TEMP/shorts-venv/bin/python -m scripts.github_render_worker"
 
