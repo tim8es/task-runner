@@ -1,0 +1,46 @@
+name: Render private Shorts job
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Opaque n8n render job ID
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out private renderer
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: tim8es/n8n-youtube-shorts-workflow
+          ref: 70534376afc81a9a1a16fde98f72bc2b8e4f3d75
+          ssh-key: ${{ secrets.PRIVATE_REPO_DEPLOY_KEY }}
+          path: task
+          persist-credentials: false
+          show-progress: false
+
+      - name: Install renderer dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg python3-venv fonts-dejavu-core
+          python3 -m venv "$RUNNER_TEMP/shorts-venv"
+          "$RUNNER_TEMP/shorts-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir 'Pillow==13.0.0' 'edge-tts==7.3.1'
+
+      - name: Render and return the result to n8n
+        working-directory: task
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          N8N_RENDER_JOB_URL: https://n8n-altare.taile7cc1a.ts.net/webhook/shorts-render-job
+          N8N_RENDER_CALLBACK_URL: https://n8n-altare.taile7cc1a.ts.net/webhook/shorts-render-callback
+          N8N_RENDER_TOKEN: ${{ secrets.PREVIEW_UPLOAD_TOKEN }}
+          OMNIROUTE_BASE_URL: https://subscript-dexterity-mutiny.ngrok-free.dev/v1
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: "$RUNNER_TEMP/shorts-venv/bin/python -m scripts.github_render_worker"
+
