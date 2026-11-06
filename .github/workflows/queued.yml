@@ -1,0 +1,36 @@
+name: Queued execution
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'queue/*.job'
+
+permissions: {}
+
+concurrency:
+  group: queued-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Prepare
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          show-progress: false
+      - name: Resolve opaque request
+        id: queued
+        run: python3 -m runner.dequeue
+      - name: Execute
+        env:
+          TASK_RUNNER_JOB_ID: ${{ steps.queued.outputs.job_id }}
+          TASK_RUNNER_REGISTRY: ${{ secrets.TASK_RUNNER_REGISTRY }}
+          TASK_RUNNER_REGISTRY_REF: ${{ secrets.TASK_RUNNER_REGISTRY_REF }}
+          TASK_RUNNER_ACCESS_TOKEN: ${{ secrets.TASK_RUNNER_ACCESS_TOKEN }}
+          TASK_RUNNER_ENV_JSON: ${{ secrets.TASK_RUNNER_ENV_JSON }}
+        run: python3 -m runner.execute
