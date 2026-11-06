@@ -18,7 +18,7 @@ jobs:
   voice:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       HF_HUB_DISABLE_TELEMETRY: '1'
       TOKENIZERS_PARALLELISM: 'false'
@@ -91,15 +91,18 @@ jobs:
           fi
 
       - name: Install full-precision Qwen3-TTS 1.7B CPU dependencies
-        timeout-minutes: 18
+        timeout-minutes: 45
         shell: bash
         run: |
           set -euo pipefail
+          echo 'Checking FFmpeg availability'
           if ! command -v ffprobe >/dev/null 2>&1 || ! command -v ffmpeg >/dev/null 2>&1; then
             sudo apt-get update -qq
             sudo apt-get install -y -qq ffmpeg
           fi
+          echo 'Installing CPU PyTorch 2.8'
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0 torchaudio==2.8.0
+          echo 'Installing Qwen TTS dependencies'
           python -m pip install qwen-tts soundfile numpy cryptography
 
       - name: Generate private Russian voice comparison
