@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: tim8es/voice-engine
-          ref: 1bc93d865119bb65781eb931c612b20ba1cc57e4
+          ref: e22ccfc533b46f11f2b302d6b0e41a999409f39f
           token: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
           path: private_code
           persist-credentials: false
@@ -50,7 +50,7 @@ jobs:
           sparse-checkout: |
             scripts
 
-      - name: Check out encrypted private job only
+      - name: Check out encrypted private job and encrypted owner profile
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: tim8es/voice-engine
@@ -61,6 +61,7 @@ jobs:
           show-progress: false
           sparse-checkout: |
             jobs
+            profiles
 
       - name: Verify private ciphertext exists
         env:
@@ -71,6 +72,23 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+
+      - name: Preflight encrypted job and persistent voice profile
+        timeout-minutes: 3
+        env:
+          FF_JOB_FERNET_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
+          JOB_ID: ${{ inputs.job_id }}
+          PYTHONPATH: ${{ github.workspace }}/private_code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'cryptography>=43,<48'
+          if python -m scripts.private_worker --preflight --job-id "$JOB_ID" --private-root private_data >/dev/null 2>&1; then
+            echo 'Encrypted job and reusable private voice reference verified'
+          else
+            echo 'Encrypted voice profile unavailable or decryption failed; no model download attempted'
+            exit 1
+          fi
 
       - name: Install full-precision Qwen3-TTS 1.7B CPU dependencies
         timeout-minutes: 18
