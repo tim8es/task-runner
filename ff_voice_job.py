@@ -164,7 +164,7 @@ def run(job_id: str, private_root: Path):
     filename = private_root / "jobs" / job_id / "input.bundle.b64"
     if not filename.is_file() or filename.is_symlink() or filename.stat().st_size > MAX_INPUT * 1.4:
         raise ValueError("PRIVATE_JOB_MISSING_OR_INVALID")
-    encrypted_input = filename.read_bytes().strip()
+    encrypted_input = b"".join(filename.read_bytes().split())
     # Decode is performed only after decryption, inside the ephemeral runner.
     content = _fernet().decrypt(encrypted_input)
     with zipfile.ZipFile(io.BytesIO(content)) as z:
