@@ -1,0 +1,30 @@
+name: Execution contract checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/universal.yml'
+      - '.github/workflows/universal-contract-tests.yml'
+      - 'runner/**'
+      - 'tests/test_universal_runner.py'
+  pull_request:
+    paths:
+      - '.github/workflows/universal.yml'
+      - '.github/workflows/universal-contract-tests.yml'
+      - 'runner/**'
+      - 'tests/test_universal_runner.py'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Check
+        run: python3 -m unittest discover -s tests -p 'test_universal_runner.py' -v
