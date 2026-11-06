@@ -26,10 +26,6 @@ jobs:
       OPENBLAS_NUM_THREADS: '2'
       HF_HOME: /tmp/ff-hf
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          persist-credentials: false
-          show-progress: false
       - name: Reject invalid job IDs and missing secrets before CPU setup
         env:
           PRIVATE_TOKEN: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
@@ -40,7 +36,18 @@ jobs:
           [[ "$JOB_ID" =~ ^[a-f0-9]{32}$ ]] || { echo 'Invalid opaque job ID'; exit 1; }
           test -n "$PRIVATE_TOKEN" || { echo 'Missing FF_PRIVATE_REPO_TOKEN'; exit 1; }
           test -n "$JOB_KEY" || { echo 'Missing FF_JOB_FERNET_KEY'; exit 1; }
-      - name: Check out PRIVATE inputs (never execute private content)
+      - name: Check out pinned PRIVATE FF worker code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: tim8es/test
+          ref: 6784d7c9379f7c020d348adfc264f320db124236
+          token: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          path: private_code
+          persist-credentials: false
+          show-progress: false
+          sparse-checkout: |
+            scripts
+      - name: Check out PRIVATE inputs (never execute staged job content)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: tim8es/test
@@ -89,7 +96,7 @@ jobs:
           set -euo pipefail
           # Upstream TTS and model logs may echo sensitive prompts. Suppress all
           # output; only report sanitized success/failure from the shell.
-          if python -m ff_voice_job run --job-id "$JOB_ID" --private-root private_data >/dev/null 2>&1; then
+          if python private_code/scripts/ff_voice_job.py run --job-id "$JOB_ID" --private-root private_data >/dev/null 2>&1; then
             echo 'Full Qwen3-TTS 1.7B completed; encrypted result stored in PRIVATE release'
           else
             echo 'Private FF Qwen job failed. No personal data or results were published.'
@@ -99,4 +106,4 @@ jobs:
         if: always()
         shell: bash
         run: |
-          rm -rf private_data "${RUNNER_TEMP}/ff-hf"
+          rm -rf private_data private_code "${RUNNER_TEMP}/ff-hf"
