@@ -48,6 +48,22 @@ class TestFFPrivateVoiceQueue(unittest.TestCase):
                 with self.assertRaises(Exception):
                     _extract(data, INPUT_NAMES, 20_000_000)
 
+    def test_public_workflow_has_no_public_artifacts_or_personal_inputs(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github" / "workflows" / "ff-qwen-private.yml")
+        if not workflow.exists():
+            workflow = root / "ff-qwen-private.yml"  # local authoring layout
+        text = workflow.read_text(encoding="utf8")
+        self.assertIn("permissions: {}", text)
+        self.assertIn("workflow_dispatch:", text)
+        self.assertIn("github.ref == 'refs/heads/main'", text)
+        self.assertIn("tim8es/test", text)
+        self.assertIn("FF_PRIVATE_REPO_TOKEN", text)
+        self.assertIn("FF_JOB_FERNET_KEY", text)
+        self.assertIn("torch==2.8.0", text)
+        self.assertNotIn("upload-artifact", text)
+        self.assertNotIn("0.6B", text)
+
     def test_zip_slip_and_missing_files_fail(self):
         key = Fernet.generate_key().decode()
         with patch.dict(os.environ, {"FF_JOB_FERNET_KEY": key}):
