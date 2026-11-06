@@ -9,8 +9,8 @@ import re
 import subprocess
 import sys
 
-QUEUE_FILE = re.compile(r"queue/([0-9a-f]{32})\\.job\\Z")
-COMMIT = re.compile(r"[0-9a-f]{40}\\Z")
+QUEUE_FILE = re.compile(r"queue/([0-9a-f]{32})\.job\Z")
+COMMIT = re.compile(r"[0-9a-f]{40}\Z")
 
 
 def job_from_commit(root, commit):
