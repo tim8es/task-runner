@@ -181,5 +181,36 @@ class RunnerContractTests(unittest.TestCase):
             self.assertTrue((root / ".github/workflows" / legacy).exists())
 
 
+    def test_universal_workflow_uses_valid_github_expressions(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/universal.yml").read_text()
+        expected = [
+            "inputs.job_id",
+            "secrets.TASK_RUNNER_REGISTRY",
+            "secrets.TASK_RUNNER_REGISTRY_REF",
+            "secrets.TASK_RUNNER_ACCESS_TOKEN",
+            "secrets.TASK_RUNNER_ENV_JSON",
+        ]
+        for variable in expected:
+            self.assertIn("${{ " + variable + " }}", workflow)
+            self.assertNotIn("${ " + variable + " }}", workflow)
+        self.assertEqual(workflow.count("${{"), 6)
+        self.assertIn("group: universal-${{ inputs.job_id }}", workflow)
+        self.assertIn("TASK_RUNNER_JOB_ID: ${{ inputs.job_id }}", workflow)
+
+    def test_root_agent_instructions_cover_privacy_and_compatibility(self):
+        root = Path(__file__).resolve().parents[1]
+        guidance = (root / "AGENTS.md").read_text()
+        for required in [
+            "docs/UNIVERSAL_EXECUTION_V1.md",
+            "PRIVATE repositories",
+            "private job manifest",
+            "Preserve every existing workflow",
+            "Test with synthetic data only",
+            "python3 -m unittest discover -s tests -v",
+        ]:
+            self.assertIn(required.lower(), guidance.lower())
+        self.assertNotIn("repository: tim8es/", guidance)
+
 if __name__ == "__main__":
     unittest.main()
