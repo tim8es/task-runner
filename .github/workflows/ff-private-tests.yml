@@ -1,13 +1,9 @@
 name: FF private job contract tests (synthetic data only)
 on:
-  push:
-    branches: [feature/ff-qwen-private-compute-20261106]
-    paths:
-      - 'tests/test_ff_runner_contract.py'
-      - '.github/workflows/ff-private-tests.yml'
   pull_request:
     paths:
       - 'tests/test_ff_runner_contract.py'
+      - '.github/workflows/ff-qwen-private.yml'
       - '.github/workflows/ff-private-tests.yml'
 permissions:
   contents: read
