@@ -36,7 +36,7 @@ class TestFFPrivateVoiceQueue(unittest.TestCase):
             bundle = root / "input.bundle.b64"
             with patch.dict(os.environ, {"FF_JOB_FERNET_KEY": key}):
                 make_input(ref, root / "reference.txt", root / "same.txt", root / "new.txt", bundle)
-                data = base64.b64decode(bundle.read_bytes())
+                data = bundle.read_bytes().strip()
                 self.assertNotIn(b"Synthetic", data)
                 files = _extract(data, INPUT_NAMES, 20_000_000)
                 self.assertEqual(files["new.txt"], b"Synthetic new text!")
