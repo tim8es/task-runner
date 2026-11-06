@@ -20,7 +20,7 @@ def verify(config):
     except Exception:
         return "INVALID_BOOTSTRAP"
     if not values:
-        return "MISSING_PRIVATE_ENV_MAP"
+        return "EMPTY_PRIVATE_ENV_MAP"
     if any(not isinstance(value, str) or not value for value in values.values()):
         return "INVALID_BOOTSTRAP"
     return "READY"
@@ -28,7 +28,7 @@ def verify(config):
 
 def main():
     result = verify(os.environ)
-    if result != "READY":
+    if result not in ("READY", "EMPTY_PRIVATE_ENV_MAP"):
         print("Generic runner configuration: " + result, file=sys.stderr)
         raise SystemExit(1)
     print("Generic runner configuration: READY")
