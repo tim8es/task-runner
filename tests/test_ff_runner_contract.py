@@ -12,7 +12,7 @@ class PrivateVoiceRunnerContract(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("repository: tim8es/voice-engine", workflow)
-        self.assertIn("ref: b7c9f71d6f1466a79750833fc6000246350af786", workflow)
+        self.assertIn("ref: e75ba8375f11562b331f77855c8d536c7bed94cc", workflow)
         self.assertIn("ref: main", workflow)  # encrypted jobs, never executed
         self.assertIn("python -m scripts.private_worker", workflow)
         self.assertIn("private_data/jobs/", workflow)
@@ -39,7 +39,7 @@ class PrivateVoiceRunnerContract(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("repository: tim8es/voice-engine", workflow)
-        self.assertIn("ref: 84e68410618b6571c00a537669c463a28a8717c4", workflow)
+        self.assertIn("ref: e75ba8375f11562b331f77855c8d536c7bed94cc", workflow)
         self.assertIn("VOICE_ENGINE_REPO_TOKEN", workflow)
         self.assertIn("FF_JOB_FERNET_KEY", workflow)
         self.assertIn("python -m scripts.private_worker --check-profile", workflow)
