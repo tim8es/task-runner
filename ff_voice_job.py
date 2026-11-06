@@ -117,7 +117,8 @@ def _private_api(path: str, token: str, data: bytes | None = None,
         headers["Content-Type"] = content_type
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     with urllib.request.urlopen(request, timeout=35) as response:
-        return json.loads(response.read(250_000).decode("utf8"))
+        payload = response.read(250_000)
+        return json.loads(payload.decode("utf8")) if payload else {}
 
 
 def _upload_private_release(token: str, job_id: str, encrypted: bytes):
@@ -126,17 +127,22 @@ def _upload_private_release(token: str, job_id: str, encrypted: bytes):
         raise RuntimeError("FF_PRIVATE_REPO_TOKEN_NOT_CONFIGURED")
     tag = "ff-voice-" + job_id
     try:
-        _private_api("/releases/tags/" + tag, token)
+        release = _private_api("/releases/tags/" + tag, token)
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
+        body = json.dumps({"tag_name": tag, "target_commitish": "main",
+                           "name": tag, "draft": False, "prerelease": True,
+                           "generate_release_notes": False,
+                           "body": "Private encrypted FF voice comparison (no plaintext)."}).encode()
+        release = _private_api("/releases", token, data=body, method="POST")
     else:
-        raise RuntimeError("JOB_ALREADY_HAS_PRIVATE_RESULT")
-    body = json.dumps({"tag_name": tag, "target_commitish": "main",
-                       "name": tag, "draft": False, "prerelease": True,
-                       "generate_release_notes": False,
-                       "body": "Private encrypted FF voice comparison (no plaintext)."}).encode()
-    release = _private_api("/releases", token, data=body, method="POST")
+        for asset in release.get("assets", []):
+            if asset.get("name") == "result.bundle" and asset.get("state") == "uploaded":
+                raise RuntimeError("JOB_ALREADY_HAS_PRIVATE_RESULT")
+            if asset.get("name") == "result.bundle" and asset.get("state") != "uploaded":
+                _private_api("/releases/assets/" + str(int(asset["id"])), token,
+                             method="DELETE")
     upload = urllib.parse.urlparse(release["upload_url"].split("{", 1)[0])
     if upload.scheme != "https" or upload.hostname != "uploads.github.com":
         raise RuntimeError("UNTRUSTED_RELEASE_UPLOAD_URL")
