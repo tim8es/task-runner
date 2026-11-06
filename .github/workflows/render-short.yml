@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: tim8es/n8n-youtube-shorts-workflow
-          ref: 0a188bb595a578950c940f725423dab1ae336a04
+          ref: b4312e4418606f01597e10f7a355442151bf9343
           ssh-key: ${{ secrets.PRIVATE_REPO_DEPLOY_KEY }}
           path: task
           persist-credentials: false
@@ -32,9 +32,12 @@ jobs:
           echo "Updating Ubuntu package indexes over IPv4"
           sudo apt-get -o Acquire::ForceIPv4=true -o Acquire::http::Timeout=45 -o Acquire::https::Timeout=45 -o Acquire::Retries=1 update
           echo "Installing renderer system packages"
-          sudo apt-get -o Acquire::ForceIPv4=true -o Acquire::http::Timeout=45 -o Acquire::https::Timeout=45 -o Acquire::Retries=1 install -y --no-install-recommends ffmpeg python3-venv fonts-dejavu-core
+          sudo apt-get -o Acquire::ForceIPv4=true -o Acquire::http::Timeout=45 -o Acquire::https::Timeout=45 -o Acquire::Retries=1 install -y --no-install-recommends ffmpeg python3-venv fonts-dejavu-core fontconfig
           python3 -m venv "$RUNNER_TEMP/shorts-venv"
           "$RUNNER_TEMP/shorts-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir 'Pillow==13.0.0' 'edge-tts==7.3.1'
+          mkdir -p "$HOME/.local/share/fonts"
+          cp task/assets/fonts/DINishCondensed-Bold.ttf "$HOME/.local/share/fonts/"
+          fc-cache -f "$HOME/.local/share/fonts"
 
       - name: Report renderer setup failure to n8n
         if: ${{ always() && steps.install_renderer_dependencies.outcome != 'success' }}
