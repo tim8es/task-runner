@@ -12,7 +12,7 @@ class PrivateVoiceRunnerContract(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("repository: tim8es/voice-engine", workflow)
-        self.assertIn("ref: 508d616455f2f3ef1d6629da449e304a6adce913", workflow)
+        self.assertIn("ref: 1bc93d865119bb65781eb931c612b20ba1cc57e4", workflow)
         self.assertIn("ref: main", workflow)  # encrypted jobs, never executed
         self.assertIn("python -m scripts.private_worker", workflow)
         self.assertIn("private_data/jobs/", workflow)
