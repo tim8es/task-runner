@@ -3,7 +3,7 @@
 The existing `render-short.yml` integration is left unchanged. New entrypoint:
 `task-runner/.github/workflows/ff-qwen-private.yml`.
 
-**Trust boundaries:** The public Actions UI sees only a random 32-character
+**Trust boundaries:** The public Actions YAML contains **no worker implementation**: it checks out the worker at a pinned SHA from private `tim8es/test`, and separately fetches encrypted jobs from its `main`. The public Actions UI sees only a random 32-character
 hexadecimal `job_id` and static status. Encrypted input lives solely in private
 `tim8es/test` (`jobs/<job_id>/input.bundle.b64`). The private result is one
 **encrypted** `result.bundle` attached to a GitHub Release in `tim8es/test`.
@@ -42,7 +42,7 @@ keep the private Git text package smaller; FFmpeg restores it to WAV before Qwen
 
 ```bash
 export FF_JOB_FERNET_KEY="$(cat /private/FF_JOB_FERNET_KEY.txt)"
-python ff_voice_job.py pack \
+python scripts/ff_voice_job.py pack \
   --reference /private/reference.flac \
   --transcript /private/reference.txt \
   --same /private/same.txt --new /private/new.txt \
@@ -72,7 +72,7 @@ export JOB_ID='<your-job-id>'
 gh release download "ff-voice-${JOB_ID}" \
   -R tim8es/test -p result.bundle -D /private/results
 export FF_JOB_FERNET_KEY="$(cat /private/FF_JOB_FERNET_KEY.txt)"
-python ff_voice_job.py unpack \
+python scripts/ff_voice_job.py unpack \
   --input /private/results/result.bundle --output-dir /private/results/clear
 unset FF_JOB_FERNET_KEY
 ```
