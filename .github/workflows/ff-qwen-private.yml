@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: tim8es/voice-engine
-          ref: 508d616455f2f3ef1d6629da449e304a6adce913
+          ref: 1bc93d865119bb65781eb931c612b20ba1cc57e4
           token: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
           path: private_code
           persist-credentials: false
