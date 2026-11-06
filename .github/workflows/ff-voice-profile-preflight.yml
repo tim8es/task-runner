@@ -20,6 +20,9 @@ jobs:
         env:
           PRIVATE_TOKEN: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
           JOB_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
+          UNIVERSAL_REGISTRY: ${{ secrets.TASK_RUNNER_REGISTRY }}
+          UNIVERSAL_TOKEN: ${{ secrets.TASK_RUNNER_ACCESS_TOKEN }}
+          UNIVERSAL_ENV_JSON: ${{ secrets.TASK_RUNNER_ENV_JSON }}
         run: |
           set -euo pipefail
           missing=0
@@ -29,6 +32,18 @@ jobs:
           fi
           if [ -z "$JOB_KEY" ]; then
             echo 'Missing FF_JOB_FERNET_KEY'
+            missing=1
+          fi
+          if [ -z "$UNIVERSAL_REGISTRY" ]; then
+            echo 'Missing TASK_RUNNER_REGISTRY'
+            missing=1
+          fi
+          if [ -z "$UNIVERSAL_TOKEN" ]; then
+            echo 'Missing TASK_RUNNER_ACCESS_TOKEN'
+            missing=1
+          fi
+          if ! python3 -c 'import json,os,sys; v=json.loads(os.environ.get("UNIVERSAL_ENV_JSON") or "{}"); sys.exit(0 if isinstance(v,dict) and all(isinstance(v.get(k),str) and bool(v.get(k)) for k in ("ff_voice_token","ff_job_fernet_key")) else 1)' >/dev/null 2>&1; then
+            echo 'Missing FF private bindings in TASK_RUNNER_ENV_JSON'
             missing=1
           fi
           exit "$missing"
