@@ -1,0 +1,102 @@
+name: FF Qwen3 1.7B - private job on public CPU
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Opaque 32-character hex FF job ID; never paste audio or transcripts here'
+        required: true
+        type: string
+
+# Never grant the public workflow write access to task-runner itself.
+permissions: {}
+concurrency:
+  group: ff-qwen-private-${{ inputs.job_id }}
+  cancel-in-progress: false
+
+jobs:
+  voice:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      HF_HOME: ${{ runner.temp }}/ff-hf
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          show-progress: false
+      - name: Reject invalid job IDs and missing secrets before CPU setup
+        env:
+          PRIVATE_TOKEN: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          JOB_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          set -euo pipefail
+          [[ "$JOB_ID" =~ ^[a-f0-9]{32}$ ]] || { echo 'Invalid opaque job ID'; exit 1; }
+          test -n "$PRIVATE_TOKEN" || { echo 'Missing FF_PRIVATE_REPO_TOKEN'; exit 1; }
+          test -n "$JOB_KEY" || { echo 'Missing FF_JOB_FERNET_KEY'; exit 1; }
+      - name: Check out PRIVATE inputs (never execute private content)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: tim8es/test
+          ref: main
+          token: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          path: private_data
+          persist-credentials: false
+          show-progress: false
+          sparse-checkout: |
+            jobs
+      - name: Check out pinned trusted FF model adapter (no staged code execution)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: tim8es/ff
+          ref: e3eb4d31dc2e80124cd77f596d1da591978cc6db
+          path: ff
+          persist-credentials: false
+          show-progress: false
+      - name: Verify encrypted job exists
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          test -s "private_data/jobs/${JOB_ID}/input.bundle.b64" || { echo 'Encrypted private job unavailable'; exit 1; }
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install full-precision Qwen3-TTS 1.7B CPU dependencies
+        timeout-minutes: 18
+        run: |
+          set -euo pipefail
+          if ! command -v ffprobe >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0 torchaudio==2.8.0
+          python -m pip install qwen-tts soundfile numpy cryptography
+      - name: Generate two RU samples and send encrypted result ONLY to private repo
+        timeout-minutes: 68
+        env:
+          FF_PRIVATE_REPO_TOKEN: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          FF_JOB_FERNET_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
+          JOB_ID: ${{ inputs.job_id }}
+          PYTHONPATH: ${{ github.workspace }}/ff
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Upstream TTS and model logs may echo sensitive prompts. Suppress all
+          # output; only report sanitized success/failure from the shell.
+          if python -m ff_voice_job run --job-id "$JOB_ID" --private-root private_data >/dev/null 2>&1; then
+            echo 'Full Qwen3-TTS 1.7B completed; encrypted result stored in PRIVATE release'
+          else
+            echo 'Private FF Qwen job failed. No personal data or results were published.'
+            exit 1
+          fi
+      - name: Remove private input and model scratch from runner workspace
+        if: always()
+        shell: bash
+        run: |
+          rm -rf private_data "${RUNNER_TEMP}/ff-hf"
