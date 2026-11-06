@@ -24,7 +24,7 @@ jobs:
       TOKENIZERS_PARALLELISM: 'false'
       OMP_NUM_THREADS: '2'
       OPENBLAS_NUM_THREADS: '2'
-      HF_HOME: ${{ runner.temp }}/ff-hf
+      HF_HOME: /tmp/ff-hf
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
