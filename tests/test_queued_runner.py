@@ -87,6 +87,7 @@ class QueuedExecutorTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         yml = (root / ".github" / "workflows" / "queued.yml").read_text()
         self.assertIn("permissions: {}", yml)
+        self.assertIn("fetch-depth: 2", yml)
         self.assertIn("branches: [main]", yml)
         self.assertIn("python3 -m runner.execute", yml)
         self.assertNotIn("upload-artifact", yml)

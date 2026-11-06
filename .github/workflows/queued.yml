@@ -23,6 +23,7 @@ jobs:
         with:
           persist-credentials: false
           show-progress: false
+          fetch-depth: 2
       - name: Resolve opaque request
         id: queued
         run: python3 -m runner.dequeue
