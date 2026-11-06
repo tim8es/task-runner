@@ -15,6 +15,7 @@ import json
 import os
 import re
 import resource
+import subprocess
 import sys
 import tempfile
 import time
@@ -27,6 +28,7 @@ from pathlib import Path
 
 JOB_ID = re.compile(r"[a-f0-9]{32}\Z")
 INPUT_NAMES = {"reference.wav", "reference.txt", "same.txt", "new.txt"}
+INPUT_FLAC_NAMES = {"reference.flac", "reference.txt", "same.txt", "new.txt"}
 OUTPUT_NAMES = {"same.wav", "new.wav", "report.json"}
 MAX_INPUT = 20_000_000
 MAX_RESULT = 75_000_000
@@ -71,14 +73,25 @@ def _extract(ciphertext: bytes, expected: set[str], max_bytes: int) -> dict[str,
 def make_input(reference: Path, transcript: Path, same: Path, new: Path, output: Path):
     """Encrypt inputs locally; never stage plaintext to any repository."""
     raw = reference.read_bytes()
-    if not raw.startswith(b"RIFF") or b"WAVE" not in raw[:16]:
-        raise ValueError("REFERENCE_MUST_BE_WAV")
-    with wave.open(io.BytesIO(raw), "rb") as w:
-        seconds = w.getnframes() / w.getframerate()
-        if w.getnchannels() != 1 or not 3 <= seconds <= 30:
-            raise ValueError("REFERENCE_MUST_BE_MONO_3_TO_30_S")
+    if reference.suffix.lower() == ".flac" and raw.startswith(b"fLaC"):
+        decoded_name = "reference.flac"
+        probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+            "stream=channels:format=duration", "-of", "json", str(reference)],
+            capture_output=True, check=True, timeout=20)
+        media = json.loads(probe.stdout.decode("utf8"))
+        channels = int(media["streams"][0]["channels"])
+        seconds = float(media["format"]["duration"])
+    elif reference.suffix.lower() == ".wav" and raw.startswith(b"RIFF") and b"WAVE" in raw[:16]:
+        decoded_name = "reference.wav"
+        with wave.open(io.BytesIO(raw), "rb") as w:
+            seconds = w.getnframes() / w.getframerate()
+            channels = w.getnchannels()
+    else:
+        raise ValueError("REFERENCE_MUST_BE_WAV_OR_LOSSLESS_FLAC")
+    if channels != 1 or not 3 <= seconds <= 30:
+        raise ValueError("REFERENCE_MUST_BE_MONO_3_TO_30_S")
     entries = {
-        "reference.wav": raw,
+        decoded_name: raw,
         "reference.txt": transcript.read_text(encoding="utf8").strip().encode("utf8"),
         "same.txt": same.read_text(encoding="utf8").strip().encode("utf8"),
         "new.txt": new.read_text(encoding="utf8").strip().encode("utf8"),
@@ -89,8 +102,8 @@ def make_input(reference: Path, transcript: Path, same: Path, new: Path, output:
         raise ValueError("TEXT_TOO_LONG")
     sealed = _fernet().encrypt(_archive(entries))
     output.parent.mkdir(parents=True, exist_ok=True)
-    # Base64 is only a GitHub text transport wrapper. Encryption is inside.
-    output.write_text(base64.b64encode(sealed).decode("ascii") + "\n", encoding="ascii")
+    # Fernet ciphertext is already authenticated, URL-safe Base64 ASCII.
+    output.write_text(sealed.decode("ascii") + "\n", encoding="ascii")
     return len(sealed)
 
 
@@ -151,8 +164,14 @@ def run(job_id: str, private_root: Path):
     filename = private_root / "jobs" / job_id / "input.bundle.b64"
     if not filename.is_file() or filename.is_symlink() or filename.stat().st_size > MAX_INPUT * 1.4:
         raise ValueError("PRIVATE_JOB_MISSING_OR_INVALID")
-    encrypted_input = base64.b64decode(filename.read_bytes(), validate=False)
-    package = _extract(encrypted_input, INPUT_NAMES, MAX_INPUT)
+    encrypted_input = filename.read_bytes().strip()
+    # Decode is performed only after decryption, inside the ephemeral runner.
+    content = _fernet().decrypt(encrypted_input)
+    with zipfile.ZipFile(io.BytesIO(content)) as z:
+        names = set(z.namelist())
+    if names not in (INPUT_NAMES, INPUT_FLAC_NAMES):
+        raise ValueError("PRIVATE_INPUT_SCHEMA_INVALID")
+    package = _extract(encrypted_input, names, MAX_INPUT)
     import numpy as np
     import soundfile as sf
     from scripts.tts_qwen import Qwen3VoiceCloner
@@ -164,7 +183,17 @@ def run(job_id: str, private_root: Path):
     with tempfile.TemporaryDirectory(prefix="ff-private-voice-") as temp:
         root = Path(temp)
         ref = root / "reference.wav"
-        ref.write_bytes(package["reference.wav"])
+        if "reference.flac" in package:
+            flac = root / "reference.flac"
+            flac.write_bytes(package["reference.flac"])
+            with open(os.devnull, "w") as devnull:
+                subprocess.run(["ffmpeg", "-v", "error", "-xerror", "-y",
+                    "-i", str(flac), "-ar", "24000", "-ac", "1",
+                    "-c:a", "pcm_s16le", str(ref)],
+                    stdout=devnull, stderr=devnull, check=True, timeout=30)
+            flac.unlink()
+        else:
+            ref.write_bytes(package["reference.wav"])
         ref_text = package["reference.txt"].decode("utf8")
         started = time.perf_counter()
         # Do not let upstream model/framework write any private prompt into logs.
