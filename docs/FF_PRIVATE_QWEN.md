@@ -33,10 +33,13 @@ Repository owner must set these two **Actions Secrets in the public
    **`tim8es/voice-engine` only**, with Contents read/write as required
    for private checkout and uploading the encrypted release result.
    Never scope it to all repositories.
-2. `FF_JOB_FERNET_KEY`: new random Fernet key, also held on the trusted
-   local machine that creates/decrypts jobs. Do not use the historically
-   exposed `FF_VOICE_BUNDLE_KEY` and do not paste any secret into workflow
-   inputs, commits, or logs.
+2. `FF_JOB_FERNET_KEY`: the **legitimate retained Fernet key
+   matching the encrypted `ff_owner` profile**. If one already encrypted
+   the old private job and was not exposed, reuse that key. A newly generated
+   key cannot decrypt the staged legacy bootstrap; rotate locally by
+   decrypting with the original key and re-encrypting `reference.bundle`
+   first. Never use the historically exposed `FF_VOICE_BUNDLE_KEY`.
+   Do not paste any secret into workflow inputs, commits or logs.
 
 The ChatGPT GitHub connector cannot configure Actions Secrets or trigger
 `workflow_dispatch`. Without these secrets, the workflow fails before
@@ -74,6 +77,16 @@ Recover and decrypt `same.wav`, `new.wav` and `report.json` on a
 trusted local device with the same key. Verify report hashes and actually
 listen to both recordings before evaluating voice likeness. Do not upload
 plain WAVs to a public Actions artifact or commit personal data.
+
+## One-time no-model profile check
+
+First configure the two Actions Secrets, then run
+`Actions → FF private voice profile preflight → Run workflow` on `main`.
+This separate lightweight workflow loads **only** encrypted `profiles/`,
+checks that the correct key decrypts the fixed `ff_owner` reference, and
+returns a generic success/failure. It does not run Qwen or require new audio,
+transcripts or text jobs. If it fails, resolve missing/mismatched Secrets or
+rotate the legacy reference securely before running the full model.
 
 ## Known limitations
 
