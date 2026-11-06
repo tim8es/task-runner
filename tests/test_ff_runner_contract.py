@@ -31,6 +31,25 @@ class PrivateVoiceRunnerContract(unittest.TestCase):
         self.assertFalse((root / "ff_voice_job.py").exists())
         self.assertFalse((root / "jobs").exists())
 
+    def test_one_time_voice_profile_check_is_private_and_model_free(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github" / "workflows" /
+                    "ff-voice-profile-preflight.yml").read_text()
+        self.assertIn("permissions: {}", workflow)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("github.ref == 'refs/heads/main'", workflow)
+        self.assertIn("repository: tim8es/voice-engine", workflow)
+        self.assertIn("ref: 84e68410618b6571c00a537669c463a28a8717c4", workflow)
+        self.assertIn("VOICE_ENGINE_REPO_TOKEN", workflow)
+        self.assertIn("FF_JOB_FERNET_KEY", workflow)
+        self.assertIn("python -m scripts.private_worker --check-profile", workflow)
+        self.assertIn("profiles", workflow)
+        self.assertIn(">/dev/null 2>&1", workflow)
+        self.assertNotIn("upload-artifact", workflow)
+        self.assertNotIn("tim8es/test", workflow)
+        self.assertNotIn("qwen-tts", workflow)
+        self.assertNotIn("torch==", workflow)
+
     def test_dispatch_accepts_only_an_opaque_id(self):
         root = Path(__file__).resolve().parents[1]
         workflow = (root / ".github" / "workflows" / "ff-qwen-private.yml").read_text()
