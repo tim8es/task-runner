@@ -11,7 +11,6 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,7 +26,7 @@ SECRET_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 REGISTRY_REF_RE = re.compile(r"^[A-Za-z0-9_./-]{1,150}$")
 MAX_MANIFEST_SIZE = 65536
 MAX_STEP_SECONDS = 21000
-MAX_TOTAL_SECONDS = 21500
+MAX_TOTAL_SECONDS = 20800
 RESERVED_ENV = frozenset({
     "PATH", "HOME", "SHELL", "ENV", "BASH_ENV", "PYTHONPATH",
     "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH",
