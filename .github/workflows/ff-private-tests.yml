@@ -3,13 +3,11 @@ on:
   push:
     branches: [feature/ff-qwen-private-compute-20261106]
     paths:
-      - 'ff_voice_job.py'
-      - 'tests/test_ff_voice_job.py'
+      - 'tests/test_ff_runner_contract.py'
       - '.github/workflows/ff-private-tests.yml'
   pull_request:
     paths:
-      - 'ff_voice_job.py'
-      - 'tests/test_ff_voice_job.py'
+      - 'tests/test_ff_runner_contract.py'
       - '.github/workflows/ff-private-tests.yml'
 permissions:
   contents: read
@@ -24,7 +22,5 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Install cryptography for synthetic fixtures
-        run: python -m pip install 'cryptography>=43,<48'
-      - name: Validate encrypted protocol without downloading Qwen or using private voice
-        run: python -m unittest discover -s tests -p 'test_ff_voice_job.py' -v
+      - name: Validate only opaque dispatch and no public artifacts
+        run: python -m unittest discover -s tests -p 'test_ff_runner_contract.py' -v
