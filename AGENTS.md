@@ -16,7 +16,8 @@ catalogue of projects, tasks, clients, or business processes.
   private callers have migrated and an end-to-end run has been verified.
 
 ## Mandatory privacy and safety rules
-- A queued job commit may contain ONLY `queue/<32-lowercase-hex>.job`, whose content is exactly that same opaque ID. Never put task data, secrets, code or private identifiers in the public queue.\n- Never commit private repository names, source URLs, commit IDs, client names,
+- A queued job commit may contain ONLY `queue/<32-lowercase-hex>.job`, whose content is exactly that same opaque ID. Never put task data, secrets, code or private identifiers in the public queue.
+- Never commit private repository names, source URLs, commit IDs, client names,
   internal service endpoints, secrets, transcripts, task data, or results.
 - Never disclose them in workflow names, step names, dispatch inputs,
   stdout/stderr, shell tracing, error messages, artifacts, caches, summaries,
