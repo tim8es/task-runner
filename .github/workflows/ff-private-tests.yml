@@ -5,11 +5,13 @@ on:
     paths:
       - 'tests/test_ff_runner_contract.py'
       - '.github/workflows/ff-qwen-private.yml'
+      - '.github/workflows/ff-voice-profile-preflight.yml'
       - '.github/workflows/ff-private-tests.yml'
   pull_request:
     paths:
       - 'tests/test_ff_runner_contract.py'
       - '.github/workflows/ff-qwen-private.yml'
+      - '.github/workflows/ff-voice-profile-preflight.yml'
       - '.github/workflows/ff-private-tests.yml'
 permissions:
   contents: read
