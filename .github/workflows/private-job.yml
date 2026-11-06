@@ -1,0 +1,82 @@
+name: Run private job
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Opaque 32-character job ID
+        required: true
+        type: string
+
+# No permissions to write to the public repository.
+permissions: {}
+
+concurrency:
+  group: private-job-${{ inputs.job_id }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Validate job and private source configuration
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          TASK_REPOSITORY: ${{ vars.TASK_REPOSITORY }}
+          TASK_CODE_REF: ${{ vars.TASK_CODE_REF }}
+          TASK_REPO_TOKEN: ${{ secrets.TASK_REPO_TOKEN }}
+          TASK_CIPHER_KEY: ${{ secrets.TASK_CIPHER_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$JOB_ID" =~ ^[a-f0-9]{32}$ ]] || exit 1
+          [[ "$TASK_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || exit 1
+          [[ "$TASK_CODE_REF" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          test -n "$TASK_REPO_TOKEN"
+          test -n "$TASK_CIPHER_KEY"
+
+      # Trusted code is pinned to an immutable private commit. Input data from
+      # main is checked out separately and never executed as code.
+      - name: Fetch trusted private executor
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: ${{ vars.TASK_REPOSITORY }}
+          ref: ${{ vars.TASK_CODE_REF }}
+          token: ${{ secrets.TASK_REPO_TOKEN }}
+          path: private_code
+          persist-credentials: false
+          show-progress: false
+          sparse-checkout: scripts
+
+      - name: Fetch private encrypted job
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: ${{ vars.TASK_REPOSITORY }}
+          ref: main
+          token: ${{ secrets.TASK_REPO_TOKEN }}
+          path: private_data
+          persist-credentials: false
+          show-progress: false
+          sparse-checkout: jobs
+
+      - name: Execute in private code
+        working-directory: private_code
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          TASK_REPO_TOKEN: ${{ secrets.TASK_REPO_TOKEN }}
+          TASK_CIPHER_KEY: ${{ secrets.TASK_CIPHER_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if bash scripts/run_private_task.sh "$JOB_ID" ../private_data >/dev/null 2>&1; then
+            echo "Private job completed"
+          else
+            echo "Private job failed"
+            exit 1
+          fi
+
+      - name: Erase temporary private workspace
+        if: always()
+        run: rm -rf private_code private_data "$RUNNER_TEMP/private-task-hf"
