@@ -1,0 +1,66 @@
+name: FF private voice profile preflight
+
+on:
+  workflow_dispatch:
+
+# No permissions for the public task-runner repository.
+permissions: {}
+
+jobs:
+  profile:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check required private credentials
+        env:
+          PRIVATE_TOKEN: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
+          JOB_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_TOKEN" || { echo 'Missing VOICE_ENGINE_REPO_TOKEN'; exit 1; }
+          test -n "$JOB_KEY" || { echo 'Missing FF_JOB_FERNET_KEY'; exit 1; }
+
+      - name: Check out pinned private Voice Engine checker
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: tim8es/voice-engine
+          ref: 84e68410618b6571c00a537669c463a28a8717c4
+          token: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
+          path: private_code
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+
+      - name: Check out encrypted owner profile (data only)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: tim8es/voice-engine
+          ref: main
+          token: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
+          path: private_data
+          persist-credentials: false
+          sparse-checkout: |
+            profiles
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Verify profile decryption without downloading Qwen
+        env:
+          FF_JOB_FERNET_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
+          PYTHONPATH: ${{ github.workspace }}/private_code
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'cryptography>=43,<48'
+          if python -m scripts.private_worker --check-profile --private-root private_data >/dev/null 2>&1; then
+            echo 'Reusable encrypted voice profile is accessible and decrypts'
+          else
+            echo 'Private voice profile is missing or key does not match'
+            exit 1
+          fi
+
+      - name: Remove private files from runner
+        if: always()
+        run: rm -rf private_data private_code
