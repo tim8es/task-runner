@@ -1,98 +1,79 @@
-# FF: full Qwen3 1.7B on PUBLIC compute, PRIVATE voice and results
+# FF Qwen3 voice comparison on a public CPU runner
 
-The existing `render-short.yml` integration is left unchanged. New entrypoint:
-`task-runner/.github/workflows/ff-qwen-private.yml`.
+This repository contains **only a restricted GitHub Actions launcher**:
+`.github/workflows/ff-qwen-private.yml`. Existing n8n/render workflows are
+independent and unchanged.
 
-**Trust boundaries:** The public Actions YAML contains **no worker implementation**: it checks out the worker at a pinned SHA from private `tim8es/test`, and separately fetches encrypted jobs from its `main`. The public Actions UI sees only a random 32-character
-hexadecimal `job_id` and static status. Encrypted input lives solely in private
-`tim8es/test` (`jobs/<job_id>/input.bundle.b64`). The private result is one
-**encrypted** `result.bundle` attached to a GitHub Release in `tim8es/test`.
-No plaintext voice, prompt, transcript, WAV, or result is committed to
-`task-runner`, printed, or uploaded to its public Actions artifacts.
+## Trust boundary and current integration
 
-**Important qualification:** During inference the GitHub-hosted public runner
-must temporarily decrypt the recording in its private process memory/disk.
-GitHub infrastructure and anyone who can modify a trusted workflow or control
-its secrets are in the trust boundary. This is not zero-knowledge processing.
-Use a protected `main` branch, restrict Actions editors and secret access,
-rotate credentials after any suspected compromise and review workflow changes.
-A private repository/release becoming public will reveal stored ciphertext;
-keep the Fernet key separate and private.
+- **Private code and encrypted jobs:** `tim8es/voice-engine`.
+- **Public execution:** `tim8es/task-runner`, manual `workflow_dispatch`
+  from protected `main`, with one opaque 32-hex `job_id`.
+- **Private model:** `Qwen/Qwen3-TTS-12Hz-1.7B-Base`, FP32, CPU;
+  no smaller model, quantization, paid API or fake fallback.
+- **Private result:** GitHub Release in `tim8es/voice-engine` with
+  `result.bundle` (Fernet-authenticated ciphertext containing
+  `same.wav`, `new.wav`, `report.json`).
+- **No personal data in public Git:** no audio, transcript, key, voice
+  embeddings, prompt, unencrypted WAV, or GitHub Actions artifact.
+- **Pinned worker:** exact Voice Engine commit SHA in workflow; the only
+  mutable checkout is encrypted `jobs/` from `voice-engine/main`.
+  Do not execute code or shell scripts from staged job data.
 
-## One-time setup (repository owner)
+The hosted public runner decrypts personal material temporarily during
+inference. GitHub infrastructure, workflow maintainers and secret holders
+are inside the trust boundary. This is **not** zero-knowledge processing.
 
-1. Create a **fine-grained GitHub PAT** restricted to **`tim8es/test` only**, with
-   repository **Contents: Read and write**. Add the PAT as Actions repository
-   secret `FF_PRIVATE_REPO_TOKEN` in public **`tim8es/task-runner`**. It is used
-   only by the isolated FF workflow (checkout private data and upload private
-   release). It is **not** reused by n8n.
-2. Generate a fresh Fernet secret locally and store it as another Actions secret
-   in `tim8es/task-runner`: `FF_JOB_FERNET_KEY`.
-   **Never use the previously exposed `FF_VOICE_BUNDLE_KEY`.**
-   Do not commit the key, paste it in dispatch input or upload it to a repository.
-3. The same key must be available on the **trusted local device/chat workspace**
-   for creating/decrypting job bundles. Never add secrets to logs or shell history.
+## One-time private secret setup
 
-## Prepare one private job
+Repository owner must set these two **Actions Secrets in the public
+`tim8es/task-runner` repository**:
 
-Use the **original lossless 24-second reference**, the word-for-word transcript
-of that selected reference, and two separate story files. The prepared moderate
-noise-reduced reference in this experiment is converted to **lossless FLAC** to
-keep the private Git text package smaller; FFmpeg restores it to WAV before Qwen.
+1. `VOICE_ENGINE_REPO_TOKEN`: fine-grained PAT restricted to
+   **`tim8es/voice-engine` only**, with Contents read/write as required
+   for private checkout and uploading the encrypted release result.
+   Never scope it to all repositories.
+2. `FF_JOB_FERNET_KEY`: new random Fernet key, also held on the trusted
+   local machine that creates/decrypts jobs. Do not use the historically
+   exposed `FF_VOICE_BUNDLE_KEY` and do not paste any secret into workflow
+   inputs, commits, or logs.
 
-```bash
-export FF_JOB_FERNET_KEY="$(cat /private/FF_JOB_FERNET_KEY.txt)"
-python scripts/ff_voice_job.py pack \
-  --reference /private/reference.flac \
-  --transcript /private/reference.txt \
-  --same /private/same.txt --new /private/new.txt \
-  --output /private/input.bundle.b64
-unset FF_JOB_FERNET_KEY
-```
+The ChatGPT GitHub connector cannot configure Actions Secrets or trigger
+`workflow_dispatch`. Without these secrets, the workflow fails before
+model setup. Do not claim the model ran until actual run evidence exists.
 
-Commit **only the Fernet ciphertext** to private repository path
-`jobs/<32-character random ID>/input.bundle.b64` (UTF-8 ASCII).
-Never commit plaintext voice, text or key, even to the private repo.
+## Generate the same-text / new-text comparison
 
-In `tim8es/task-runner → Actions → FF Qwen3 1.7B - private job on public CPU → Run workflow`, select the **main** branch and enter **only the opaque job ID**.
-No payload, key or personal words go into workflow inputs.
+Use the instructions in `tim8es/voice-engine/docs/OPERATIONS.md`.
+The local job preparation and decryption entry point is
+`python -m scripts.private_job_cli` in the **private** Voice Engine repo.
 
-The workflow checks out only private `jobs/`, checks out the **pinned** public FF
-Qwen adapter, then loads **`Qwen/Qwen3-TTS-12Hz-1.7B-Base`** with `float32` on
-CPU. It creates two **Russian** samples using the same cloned voice prompt.
-GPU, quantization, smaller model, external paid TTS and unrelated fallbacks are
-not used. Expect weight download and CPU inference on each cold runner.
+Prepare an authorized speaker reference from the actual recording using
+`python -m scripts.audio_improve` with
+`--preset conservative --strength 0.55` (moderate, not strong) and a
+word-for-word transcript of the selected sample. Put the verbatim original
+comparison story in `same.txt` and a different story of comparable
+length/style in `new.txt`. Do not include emotion-direction labels in
+the spoken text.
 
-## Recover outputs privately
+Encrypted input is staged only as
+`voice-engine/jobs/<job_id>/input.bundle.b64`. Choose
+`Actions → FF Qwen3 1.7B - private Voice Engine job → Run workflow`
+on `main`, entering the opaque `job_id` only.
 
-Use a GitHub-authenticated local CLI session with access to `tim8es/test`:
+After success, use the authenticated GitHub CLI to retrieve the private
+`ff-voice-<job_id>` release from `tim8es/voice-engine`, then decrypt
+`result.bundle` **locally** using the same Fernet key. Listen to both WAVs,
+verify their hashes against `report.json`, and compare voice similarity.
 
-```bash
-export JOB_ID='<your-job-id>'
-gh release download "ff-voice-${JOB_ID}" \
-  -R tim8es/test -p result.bundle -D /private/results
-export FF_JOB_FERNET_KEY="$(cat /private/FF_JOB_FERNET_KEY.txt)"
-python scripts/ff_voice_job.py unpack \
-  --input /private/results/result.bundle --output-dir /private/results/clear
-unset FF_JOB_FERNET_KEY
-```
+Do not store decrypted samples in public releases or commit them to public
+repositories. Dispose of private source and result material under the
+agreed retention policy.
 
-Expected output: `same.wav`, `new.wav`, `report.json`. Inspect the audio,
-compare the user's real recording to the model-generated *same text*, and judge
-generalization on *new text*. Don't assume that repeating a text proves voice
-similarity or that an encrypted successful job passes subjective QA.
+## Known limitations
 
-After retrieval, delete private release and encrypted job when no longer needed.
-The deleted Git blobs may still exist in history temporarily, but remain
-ciphertext protected by the separate key.
-
-## Operational limitations
-
-- A GitHub connector **cannot create repository Secrets** in this chat. Two
-  one-time settings above require the repository owner. Until set, the private
-  model run fails early without downloading Qwen or exposing personal material.
-- Public workflow has `permissions: {}` and **no** `upload-artifact`, printing,
-  private HTTP callback, or n8n integration. n8n task-runner jobs remain intact.
-- Current FF adapter has a **project-side 3–30 second validation**, not a
-  documented universal Qwen maximum. We use the selected 23.75-second sample.
-- Private release persists until manually removed. No automated public upload.
+The original user recording must be locally available, the selected
+reference transcript must match it, and the two GitHub secrets must be set.
+The runner has not been certified for a full-model production run merely
+because the workflow and synthetic tests pass. CPU model downloads and
+inference must fit within the workflow timeout.
