@@ -1,14 +1,14 @@
-name: FF Qwen3 1.7B - private job on public CPU
+name: FF Qwen3 1.7B - private Voice Engine job
 
 on:
   workflow_dispatch:
     inputs:
       job_id:
-        description: 'Opaque 32-character hex FF job ID; never paste audio or transcripts here'
+        description: 'Opaque 32-character hex job ID only; never paste personal data'
         required: true
         type: string
 
-# Never grant the public workflow write access to task-runner itself.
+# This PUBLIC repository may run trusted PRIVATE code, but may not write to itself.
 permissions: {}
 concurrency:
   group: ff-qwen-private-${{ inputs.job_id }}
@@ -26,84 +26,84 @@ jobs:
       OPENBLAS_NUM_THREADS: '2'
       HF_HOME: /tmp/ff-hf
     steps:
-      - name: Reject invalid job IDs and missing secrets before CPU setup
+      - name: Validate job ID and required secrets before model setup
         env:
-          PRIVATE_TOKEN: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          PRIVATE_TOKEN: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
           JOB_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
           JOB_ID: ${{ inputs.job_id }}
+        shell: bash
         run: |
           set -euo pipefail
           [[ "$JOB_ID" =~ ^[a-f0-9]{32}$ ]] || { echo 'Invalid opaque job ID'; exit 1; }
-          test -n "$PRIVATE_TOKEN" || { echo 'Missing FF_PRIVATE_REPO_TOKEN'; exit 1; }
+          test -n "$PRIVATE_TOKEN" || { echo 'Missing VOICE_ENGINE_REPO_TOKEN'; exit 1; }
           test -n "$JOB_KEY" || { echo 'Missing FF_JOB_FERNET_KEY'; exit 1; }
-      - name: Check out pinned PRIVATE FF worker code
+
+      - name: Check out pinned private Voice Engine code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          repository: tim8es/test
-          ref: 6784d7c9379f7c020d348adfc264f320db124236
-          token: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          repository: tim8es/voice-engine
+          ref: 508d616455f2f3ef1d6629da449e304a6adce913
+          token: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
           path: private_code
           persist-credentials: false
           show-progress: false
           sparse-checkout: |
             scripts
-      - name: Check out PRIVATE inputs (never execute staged job content)
+
+      - name: Check out encrypted private job only
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          repository: tim8es/test
+          repository: tim8es/voice-engine
           ref: main
-          token: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          token: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
           path: private_data
           persist-credentials: false
           show-progress: false
           sparse-checkout: |
             jobs
-      - name: Check out pinned trusted FF model adapter (no staged code execution)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          repository: tim8es/ff
-          ref: e3eb4d31dc2e80124cd77f596d1da591978cc6db
-          path: ff
-          persist-credentials: false
-          show-progress: false
-      - name: Verify encrypted job exists
+
+      - name: Verify private ciphertext exists
         env:
           JOB_ID: ${{ inputs.job_id }}
         run: |
           test -s "private_data/jobs/${JOB_ID}/input.bundle.b64" || { echo 'Encrypted private job unavailable'; exit 1; }
+
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+
       - name: Install full-precision Qwen3-TTS 1.7B CPU dependencies
         timeout-minutes: 18
+        shell: bash
         run: |
           set -euo pipefail
-          if ! command -v ffprobe >/dev/null 2>&1; then
+          if ! command -v ffprobe >/dev/null 2>&1 || ! command -v ffmpeg >/dev/null 2>&1; then
             sudo apt-get update -qq
             sudo apt-get install -y -qq ffmpeg
           fi
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0 torchaudio==2.8.0
           python -m pip install qwen-tts soundfile numpy cryptography
-      - name: Generate two RU samples and send encrypted result ONLY to private repo
+
+      - name: Generate private Russian voice comparison
         timeout-minutes: 68
         env:
-          FF_PRIVATE_REPO_TOKEN: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
-          FF_JOB_FERNET_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
           JOB_ID: ${{ inputs.job_id }}
-          PYTHONPATH: ${{ github.workspace }}/ff
+          FF_VOICE_ENGINE_TOKEN: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
+          FF_JOB_FERNET_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
+          PYTHONPATH: ${{ github.workspace }}/private_code
         shell: bash
         run: |
           set -euo pipefail
-          # Upstream TTS and model logs may echo sensitive prompts. Suppress all
-          # output; only report sanitized success/failure from the shell.
-          if python private_code/scripts/ff_voice_job.py run --job-id "$JOB_ID" --private-root private_data >/dev/null 2>&1; then
-            echo 'Full Qwen3-TTS 1.7B completed; encrypted result stored in PRIVATE release'
+          # Inference packages may log transcripts. No model output goes to public logs.
+          if python -m scripts.private_worker --job-id "$JOB_ID" --private-root private_data >/dev/null 2>&1; then
+            echo 'Qwen3 1.7B completed; encrypted result stored in private Voice Engine release'
           else
-            echo 'Private FF Qwen job failed. No personal data or results were published.'
+            echo 'Private Voice Engine job failed. No personal data was published.'
             exit 1
           fi
-      - name: Remove private input and model scratch from runner workspace
+
+      - name: Delete private files and model cache from runner
         if: always()
         shell: bash
         run: |
-          rm -rf private_data private_code "${RUNNER_TEMP}/ff-hf"
+          rm -rf private_data private_code /tmp/ff-hf
