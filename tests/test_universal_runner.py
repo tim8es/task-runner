@@ -132,18 +132,30 @@ class RunnerContractTests(unittest.TestCase):
 
     def test_real_private_code_path_cannot_escape_checkout(self):
         with tempfile.TemporaryDirectory() as tmp:
-            repo = Path(tmp) / "checkout"
-            repo.mkdir()
-            (Path(tmp) / "elsewhere").mkdir()
+            external = Path(tmp) / "outside"
+            external.mkdir()
             plan = private_manifest()
             plan["execution"]["workingDirectory"] = "redirect"
-            (repo / "redirect").symlink_to(Path(tmp) / "elsewhere", target_is_directory=True)
+
+            def fake_checkout(_repository, _commit, _token, destination):
+                destination.mkdir()
+                (destination / "redirect").symlink_to(external, target_is_directory=True)
+
             with (mock.patch.object(runner, "load_manifest", return_value=plan),
-                  mock.patch.object(runner, "checkout_private_source")):
-                # execute_job normally creates the private checkout in a new temp dir;
-                # validate target resolution separately for the unsafe symlink case.
-                path = (repo / "redirect").resolve()
-                self.assertFalse(path.is_relative_to(repo.resolve()))
+                  mock.patch.object(runner, "checkout_private_source", side_effect=fake_checkout)):
+                with self.assertRaises(runner.RunnerError):
+                    runner.execute_job(JOB_ID, "example/registry", "main", "token", {})
+
+    def test_private_exception_is_redacted_from_public_error(self):
+        with mock.patch.dict(os.environ, {"TASK_RUNNER_JOB_ID": JOB_ID}):
+            out, err = io.StringIO(), io.StringIO()
+            with (mock.patch.object(runner, "execute_job",
+                                    side_effect=RuntimeError("repo-name-and-secret")),
+                  redirect_stdout(out), redirect_stderr(err)):
+                status = runner.main()
+        self.assertEqual(status, 1)
+        self.assertNotIn("repo-name-and-secret", err.getvalue())
+        self.assertEqual(err.getvalue(), "Execution failed\n")
 
     def test_failure_reports_no_private_diagnostics(self):
         with mock.patch.dict(os.environ, {"TASK_RUNNER_JOB_ID": "private-name"}):
