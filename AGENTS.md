@@ -7,7 +7,7 @@ catalogue of projects, tasks, clients, or business processes.
 
 ## Before editing
 - Read `docs/UNIVERSAL_EXECUTION_V1.md` and the relevant tests.
-- Treat `.github/workflows/universal.yml` and `runner/execute.py` as the
+- Treat `.github/workflows/universal.yml`, `.github/workflows/queued.yml`, `runner/dequeue.py` and `runner/execute.py` as the
   generic v1 interface. New consumers use a private job manifest, a pinned
   private source commit, and an opaque 32-character hex `job_id`.
 - Keep project-specific code, configuration, entrypoints, URLs, dependencies,
@@ -16,7 +16,7 @@ catalogue of projects, tasks, clients, or business processes.
   private callers have migrated and an end-to-end run has been verified.
 
 ## Mandatory privacy and safety rules
-- Never commit private repository names, source URLs, commit IDs, client names,
+- A queued job commit may contain ONLY `queue/<32-lowercase-hex>.job`, whose content is exactly that same opaque ID. Never put task data, secrets, code or private identifiers in the public queue.\n- Never commit private repository names, source URLs, commit IDs, client names,
   internal service endpoints, secrets, transcripts, task data, or results.
 - Never disclose them in workflow names, step names, dispatch inputs,
   stdout/stderr, shell tracing, error messages, artifacts, caches, summaries,
