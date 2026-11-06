@@ -22,8 +22,16 @@ jobs:
           JOB_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
         run: |
           set -euo pipefail
-          test -n "$PRIVATE_TOKEN" || { echo 'Missing VOICE_ENGINE_REPO_TOKEN'; exit 1; }
-          test -n "$JOB_KEY" || { echo 'Missing FF_JOB_FERNET_KEY'; exit 1; }
+          missing=0
+          if [ -z "$PRIVATE_TOKEN" ]; then
+            echo 'Missing VOICE_ENGINE_REPO_TOKEN'
+            missing=1
+          fi
+          if [ -z "$JOB_KEY" ]; then
+            echo 'Missing FF_JOB_FERNET_KEY'
+            missing=1
+          fi
+          exit "$missing"
 
       - name: Check out pinned private Voice Engine checker
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
