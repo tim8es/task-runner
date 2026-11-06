@@ -28,49 +28,41 @@ jobs:
     steps:
       - name: Reject invalid job IDs and missing secrets before CPU setup
         env:
-          PRIVATE_TOKEN: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          PRIVATE_TOKEN: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
           JOB_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
           JOB_ID: ${{ inputs.job_id }}
         run: |
           set -euo pipefail
           [[ "$JOB_ID" =~ ^[a-f0-9]{32}$ ]] || { echo 'Invalid opaque job ID'; exit 1; }
-          test -n "$PRIVATE_TOKEN" || { echo 'Missing FF_PRIVATE_REPO_TOKEN'; exit 1; }
+          test -n "$PRIVATE_TOKEN" || { echo 'Missing VOICE_ENGINE_REPO_TOKEN'; exit 1; }
           test -n "$JOB_KEY" || { echo 'Missing FF_JOB_FERNET_KEY'; exit 1; }
-      - name: Check out pinned PRIVATE FF worker code
+      - name: Check out pinned PRIVATE Voice Engine worker
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          repository: tim8es/test
-          ref: 6784d7c9379f7c020d348adfc264f320db124236
-          token: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
-          path: private_code
+          repository: tim8es/voice-engine
+          ref: 508d616455f2f3ef1d6629da449e304a6adce913
+          token: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
+          path: engine_code
           persist-credentials: false
           show-progress: false
           sparse-checkout: |
             scripts
-      - name: Check out PRIVATE inputs (never execute staged job content)
+      - name: Check out encrypted Voice Engine inputs (do not execute staged content)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          repository: tim8es/test
+          repository: tim8es/voice-engine
           ref: main
-          token: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
-          path: private_data
+          token: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
+          path: engine_data
           persist-credentials: false
           show-progress: false
           sparse-checkout: |
             jobs
-      - name: Check out pinned trusted FF model adapter (no staged code execution)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          repository: tim8es/ff
-          ref: e3eb4d31dc2e80124cd77f596d1da591978cc6db
-          path: ff
-          persist-credentials: false
-          show-progress: false
       - name: Verify encrypted job exists
         env:
           JOB_ID: ${{ inputs.job_id }}
         run: |
-          test -s "private_data/jobs/${JOB_ID}/input.bundle.b64" || { echo 'Encrypted private job unavailable'; exit 1; }
+          test -s "engine_data/jobs/${JOB_ID}/input.bundle.b64" || { echo 'Encrypted private job unavailable'; exit 1; }
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
@@ -87,16 +79,16 @@ jobs:
       - name: Generate two RU samples and send encrypted result ONLY to private repo
         timeout-minutes: 68
         env:
-          FF_PRIVATE_REPO_TOKEN: ${{ secrets.FF_PRIVATE_REPO_TOKEN }}
+          VOICE_ENGINE_REPO_TOKEN: ${{ secrets.VOICE_ENGINE_REPO_TOKEN }}
           FF_JOB_FERNET_KEY: ${{ secrets.FF_JOB_FERNET_KEY }}
           JOB_ID: ${{ inputs.job_id }}
-          PYTHONPATH: ${{ github.workspace }}/ff
+          PYTHONPATH: ${{ github.workspace }}/engine_code
         shell: bash
         run: |
           set -euo pipefail
           # Upstream TTS and model logs may echo sensitive prompts. Suppress all
           # output; only report sanitized success/failure from the shell.
-          if python private_code/scripts/ff_voice_job.py run --job-id "$JOB_ID" --private-root private_data >/dev/null 2>&1; then
+          if python engine_code/scripts/private_worker.py --job-id "$JOB_ID" --private-root engine_data >/dev/null 2>&1; then
             echo 'Full Qwen3-TTS 1.7B completed; encrypted result stored in PRIVATE release'
           else
             echo 'Private FF Qwen job failed. No personal data or results were published.'
@@ -106,4 +98,4 @@ jobs:
         if: always()
         shell: bash
         run: |
-          rm -rf private_data private_code "${RUNNER_TEMP}/ff-hf"
+          rm -rf engine_data engine_code "${RUNNER_TEMP}/ff-hf"
