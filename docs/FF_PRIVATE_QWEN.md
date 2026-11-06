@@ -17,7 +17,7 @@ independent and unchanged.
 - **No personal data in public Git:** no audio, transcript, key, voice
   embeddings, prompt, unencrypted WAV, or GitHub Actions artifact.
 - **Pinned worker:** exact Voice Engine commit SHA in workflow; the only
-  mutable checkout is encrypted `jobs/` from `voice-engine/main`.
+  mutable checkout is encrypted `jobs/` and `profiles/` from `voice-engine/main`.
   Do not execute code or shell scripts from staged job data.
 
 The hosted public runner decrypts personal material temporarily during
@@ -42,38 +42,44 @@ The ChatGPT GitHub connector cannot configure Actions Secrets or trigger
 `workflow_dispatch`. Without these secrets, the workflow fails before
 model setup. Do not claim the model ran until actual run evidence exists.
 
-## Generate the same-text / new-text comparison
+## Reusable voice profile — no repeated audio uploads
 
-Use the instructions in `tim8es/voice-engine/docs/OPERATIONS.md`.
-The local job preparation and decryption entry point is
-`python -m scripts.private_job_cli` in the **private** Voice Engine repo.
+An already encrypted legacy personal-voice job has been staged, without
+decryption, at **private**
+`tim8es/voice-engine/profiles/ff_owner/bootstrap.bundle`.
+The private worker can reuse its embedded reference audio/transcript for
+future text-only jobs **if** the configured Fernet key decrypts the
+bootstrap. It prefers the smaller, separately encrypted permanent
+`profiles/ff_owner/reference.bundle` when available. Migration from
+legacy ciphertext, key rotation and initial owner setup are documented
+in `tim8es/voice-engine/docs/OPERATIONS.md`.
 
-Prepare an authorized speaker reference from the actual recording using
-`python -m scripts.audio_improve` with
-`--preset conservative --strength 0.55` (moderate, not strong) and a
-word-for-word transcript of the selected sample. Put the verbatim original
-comparison story in `same.txt` and a different story of comparable
-length/style in `new.txt`. Do not include emotion-direction labels in
-the spoken text.
+For subsequent generations, prepare **only** the two new text files in
+a trusted local environment. Create an encrypted job with
+`python -m scripts.private_job_cli pack-texts --profile ff_owner --same
+/private/same.txt --new /private/new.txt --output /private/input.bundle.b64`.
+Stage **only this ciphertext** in the private Voice Engine repository at
+`jobs/<job_id>/input.bundle.b64`.
 
-Encrypted input is staged only as
-`voice-engine/jobs/<job_id>/input.bundle.b64`. Choose
+Select
 `Actions → FF Qwen3 1.7B - private Voice Engine job → Run workflow`
-on `main`, entering the opaque `job_id` only.
+on `main`, entering **only** the opaque `job_id`.
+The workflow first checks both ciphertext files and decrypts the
+configured profile with a lightweight cryptography-only **preflight**.
+On missing/mismatched key it fails **before** downloading Qwen weights.
+On success it runs full FP32 Qwen3-TTS 1.7B on CPU and stores
+`result.bundle` **only** in a private Voice Engine Release.
 
-After success, use the authenticated GitHub CLI to retrieve the private
-`ff-voice-<job_id>` release from `tim8es/voice-engine`, then decrypt
-`result.bundle` **locally** using the same Fernet key. Listen to both WAVs,
-verify their hashes against `report.json`, and compare voice similarity.
-
-Do not store decrypted samples in public releases or commit them to public
-repositories. Dispose of private source and result material under the
-agreed retention policy.
+Recover and decrypt `same.wav`, `new.wav` and `report.json` on a
+trusted local device with the same key. Verify report hashes and actually
+listen to both recordings before evaluating voice likeness. Do not upload
+plain WAVs to a public Actions artifact or commit personal data.
 
 ## Known limitations
 
-The original user recording must be locally available, the selected
-reference transcript must match it, and the two GitHub secrets must be set.
-The runner has not been certified for a full-model production run merely
+The archived encrypted recording must decrypt with a legitimate retained
+key and contain the correct audio/transcript. If neither the original key
+nor a usable recording exists, the owner must provide an audio sample once.
+The two GitHub Secrets must be configured. The runner has not been certified for a full-model production run merely
 because the workflow and synthetic tests pass. CPU model downloads and
 inference must fit within the workflow timeout.
