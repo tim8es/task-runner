@@ -36,7 +36,7 @@ catalogue of projects, tasks, clients, or business processes.
 2. Test with synthetic data only; do not use real private repositories or
    secrets in public CI.
 3. Run `python3 -m unittest discover -s tests -v`.
-4. Validate GitHub Actions expressions (`\u0024{{ ... }}`), contract shape,
+4. Validate GitHub Actions expressions (`${{ ... }}`), contract shape,
    log redaction, and compatibility with legacy entrypoints.
 5. For an actual migration, verify a successful PRIVATE result and inspect
    the PUBLIC run logs before retiring the old workflow.
