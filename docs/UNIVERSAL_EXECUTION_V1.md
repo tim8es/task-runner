@@ -115,3 +115,26 @@ history may still reveal old identifiers after the legacy file is removed.
 
 The synthetic public contract test does not access private credentials or
 prove an end-to-end private run.
+
+## Optional zero-API dispatch through an opaque public queue
+
+For environments where trusted tooling can commit but cannot call the workflow
+API, `queued.yml` provides an additive generic trigger. Stage the private
+`jobs/<job_id>.json` manifest **first**. Then, as a trusted committer on public
+`main`, create one new file `queue/<job_id>.job` with content exactly
+`<job_id>` followed by an optional newline. Use a single-file commit; any
+additional changed file, edited existing entry, invalid ID, or unexpected
+content is rejected. The workflow starts after the push and calls the same
+universal `runner.execute`. No public artifact or private details are emitted.
+
+Public observers can see this opaque ID, the committer, timestamps, execution
+duration, state and repository history. This is not anonymous execution and
+GitHub/Actions operators have access to the runner environment. The queue is
+not a permission boundary: public branch write access must remain restricted.
+Do not use public pull requests to trigger access to private credentials.
+
+Use a new random job ID for each run, even when benchmarking the same private
+input. The private registry manifest stays pinned to an immutable reviewed
+source commit. The manual `universal.yml` interface and all legacy workflows
+remain unchanged. Avoid storing tasks or their parameters in public file
+contents, commit messages, or branch names.
