@@ -15,11 +15,20 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
+      - name: Validate private renderer revision
+        env:
+          PRIVATE_RENDERER_REF: ${{ secrets.PRIVATE_RENDERER_REF }}
+        run: |
+          if [[ ! "$PRIVATE_RENDERER_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Private renderer revision is not configured"
+            exit 1
+          fi
+
       - name: Check out private renderer
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           repository: tim8es/n8n-youtube-shorts-workflow
-          ref: 521f063b01155dbac2b707c5efb12d71ff118719
+          ref: ${{ secrets.PRIVATE_RENDERER_REF }}
           ssh-key: ${{ secrets.PRIVATE_REPO_DEPLOY_KEY }}
           path: task
           persist-credentials: false
