@@ -1,6 +1,9 @@
 name: Runner check
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/render-short.yml'
   workflow_dispatch:
 
 permissions: {}
@@ -8,6 +11,7 @@ permissions: {}
 jobs:
   check:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Install FFmpeg
         run: |
