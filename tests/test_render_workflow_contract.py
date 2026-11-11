@@ -18,5 +18,15 @@ class RenderWorkflowContract(unittest.TestCase):
         self.assertNotIn("upload-artifact", workflow)
 
 
+    def test_render_dependencies_keep_runner_apt_failover_defaults(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github" / "workflows" / "render-short.yml").read_text()
+        install = workflow.split("      - name: Install renderer dependencies", 1)[1].split(
+            "      - name: Report renderer setup failure", 1
+        )[0]
+
+        self.assertIn("sudo apt-get -o Acquire::ForceIPv4=true update", install)
+        self.assertNotRegex(install, r"Acquire::(?:http::Timeout|https::Timeout|Retries)=")
+
 if __name__ == "__main__":
     unittest.main()
