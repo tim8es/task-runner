@@ -224,7 +224,17 @@ def checkout_private_source(repository: str, commit: str, token: str, destinatio
         askpass.unlink(missing_ok=True)
 
 
-def build_worker_environment(payload: dict, secret_values: dict, job_id: str) -> dict:
+def validate_run_provenance(run_id: str, run_attempt: str) -> tuple[str, str]:
+    if (not isinstance(run_id, str) or not re.fullmatch(r"[1-9][0-9]*", run_id)
+            or not isinstance(run_attempt, str)
+            or not re.fullmatch(r"[1-9][0-9]*", run_attempt)):
+        raise RunnerError("Invalid workflow provenance")
+    return run_id, run_attempt
+
+
+def build_worker_environment(payload: dict, secret_values: dict, job_id: str,
+                             run_id: str, run_attempt: str) -> dict:
+    run_id, run_attempt = validate_run_provenance(run_id, run_attempt)
     if not isinstance(secret_values, dict):
         raise RunnerError("Invalid private environment")
     worker = os.environ.copy()
@@ -235,6 +245,8 @@ def build_worker_environment(payload: dict, secret_values: dict, job_id: str) ->
                             "ACTIONS_RUNTIME_URL", "ACTIONS_CACHE_URL"}):
             worker.pop(name, None)
     worker["TASK_JOB_ID"] = job_id
+    worker["TASK_RUNNER_RUN_ID"] = run_id
+    worker["TASK_RUNNER_RUN_ATTEMPT"] = run_attempt
     for name, binding in payload.get("environment", {}).items():
         if "jobId" in binding:
             worker[name] = job_id
@@ -246,8 +258,10 @@ def build_worker_environment(payload: dict, secret_values: dict, job_id: str) ->
     return worker
 
 
-def execute_job(job_id: str, registry: str, registry_ref: str, token: str, secret_values: dict) -> None:
+def execute_job(job_id: str, registry: str, registry_ref: str, token: str,
+                secret_values: dict, run_id: str, run_attempt: str) -> None:
     validate_job_id(job_id)
+    run_id, run_attempt = validate_run_provenance(run_id, run_attempt)
     plan = load_manifest(job_id, registry, registry_ref, token)
     with tempfile.TemporaryDirectory(prefix="universal-task-") as tmp:
         destination = Path(tmp) / "source"
@@ -257,7 +271,7 @@ def execute_job(job_id: str, registry: str, registry_ref: str, token: str, secre
         workdir = (destination / plan["execution"]["workingDirectory"]).resolve()
         if not workdir.is_relative_to(destination.resolve()) or not workdir.is_dir():
             raise RunnerError("Invalid execution directory")
-        worker_env = build_worker_environment(plan, secret_values, job_id)
+        worker_env = build_worker_environment(plan, secret_values, job_id, run_id, run_attempt)
         for step in plan["execution"]["steps"]:
             argv = [part.replace("{{job_id}}", job_id) for part in step["argv"]]
             _run_silent(argv, cwd=workdir, env=worker_env, timeout=step["timeoutSeconds"])
@@ -270,7 +284,9 @@ def main() -> int:
         registry_ref = os.environ.get("TASK_RUNNER_REGISTRY_REF") or "main"
         token = os.environ.get("TASK_RUNNER_ACCESS_TOKEN", "")
         secret_values = json.loads(os.environ.get("TASK_RUNNER_ENV_JSON") or "{}")
-        execute_job(job_id, registry, registry_ref, token, secret_values)
+        execute_job(job_id, registry, registry_ref, token, secret_values,
+                    os.environ.get("GITHUB_RUN_ID", ""),
+                    os.environ.get("GITHUB_RUN_ATTEMPT", ""))
         print("Execution completed")
         return 0
     except Exception:
