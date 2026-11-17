@@ -82,23 +82,35 @@ class RunnerContractTests(unittest.TestCase):
         with self.assertRaises(runner.RunnerError):
             runner.validate_manifest(payload)
 
+    def test_run_provenance_rejects_missing_or_invalid_values(self):
+        self.assertEqual(runner.validate_run_provenance("123", "2"), ("123", "2"))
+        for run_id, attempt in [("", "1"), ("0", "1"), ("1", ""), ("1", "0"), ("x", "1")]:
+            with self.subTest(run_id=run_id, attempt=attempt), self.assertRaises(runner.RunnerError):
+                runner.validate_run_provenance(run_id, attempt)
+
     def test_worker_only_receives_allowlisted_credentials(self):
         with mock.patch.dict(os.environ, {
             "TASK_RUNNER_ACCESS_TOKEN": "bootstrap-password",
             "TASK_RUNNER_ENV_JSON": "credential-map",
+            "GITHUB_RUN_ID": "123",
+            "GITHUB_RUN_ATTEMPT": "2",
             "GITHUB_OUTPUT": "/tmp/output",
             "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "oidc",
             "GH_TOKEN": "github-token",
         }):
             env = runner.build_worker_environment(
-                private_manifest(), {"private_token": "only-this-secret"}, JOB_ID
+                private_manifest(), {"private_token": "only-this-secret"}, JOB_ID, "123", "2"
             )
         self.assertEqual(env["PRIVATE_TOKEN"], "only-this-secret")
         self.assertEqual(env["PROCESS_ID"], JOB_ID)
         self.assertEqual(env["TASK_JOB_ID"], JOB_ID)
-        for name in ["TASK_RUNNER_ACCESS_TOKEN", "TASK_RUNNER_ENV_JSON",
-                     "GITHUB_OUTPUT", "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "GH_TOKEN"]:
-            self.assertNotIn(name, env)
+        self.assertEqual(env["TASK_RUNNER_RUN_ID"], "123")
+        self.assertEqual(env["TASK_RUNNER_RUN_ATTEMPT"], "2")
+        self.assertEqual(env["GITHUB_RUN_ID"], "123")
+        self.assertEqual(env["GITHUB_RUN_ATTEMPT"], "2")
+        for name in ["TASK_RUNNER_ACCESS_TOKEN", "TASK_RUNNER_ENV_JSON", "GITHUB_OUTPUT",
+                     "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "GH_TOKEN"]:
+            self.assertFalse(name in env, f"Unexpected worker environment key: {name}")
 
     def test_private_manifest_download_uses_credentials_without_logging(self):
         class DummyResponse:
@@ -144,10 +156,12 @@ class RunnerContractTests(unittest.TestCase):
             with (mock.patch.object(runner, "load_manifest", return_value=plan),
                   mock.patch.object(runner, "checkout_private_source", side_effect=fake_checkout)):
                 with self.assertRaises(runner.RunnerError):
-                    runner.execute_job(JOB_ID, "example/registry", "main", "token", {})
+                    runner.execute_job(JOB_ID, "example/registry", "main", "token", {}, "123", "1")
 
     def test_private_exception_is_redacted_from_public_error(self):
-        with mock.patch.dict(os.environ, {"TASK_RUNNER_JOB_ID": JOB_ID}):
+        with mock.patch.dict(os.environ, {"TASK_RUNNER_JOB_ID": JOB_ID,
+                                      "GITHUB_RUN_ID": "123",
+                                      "GITHUB_RUN_ATTEMPT": "1"}):
             out, err = io.StringIO(), io.StringIO()
             with (mock.patch.object(runner, "execute_job",
                                     side_effect=RuntimeError("repo-name-and-secret")),
@@ -158,7 +172,9 @@ class RunnerContractTests(unittest.TestCase):
         self.assertEqual(err.getvalue(), "Execution failed\n")
 
     def test_failure_reports_no_private_diagnostics(self):
-        with mock.patch.dict(os.environ, {"TASK_RUNNER_JOB_ID": "private-name"}):
+        with mock.patch.dict(os.environ, {"TASK_RUNNER_JOB_ID": "private-name",
+                                      "GITHUB_RUN_ID": "123",
+                                      "GITHUB_RUN_ATTEMPT": "1"}):
             out, err = io.StringIO(), io.StringIO()
             with redirect_stdout(out), redirect_stderr(err):
                 status = runner.main()
