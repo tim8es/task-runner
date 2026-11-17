@@ -106,8 +106,9 @@ class RunnerContractTests(unittest.TestCase):
         self.assertEqual(env["TASK_JOB_ID"], JOB_ID)
         self.assertEqual(env["TASK_RUNNER_RUN_ID"], "123")
         self.assertEqual(env["TASK_RUNNER_RUN_ATTEMPT"], "2")
-        for name in ["TASK_RUNNER_ACCESS_TOKEN", "TASK_RUNNER_ENV_JSON",
-                     "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_OUTPUT",
+        self.assertEqual(env["GITHUB_RUN_ID"], "123")
+        self.assertEqual(env["GITHUB_RUN_ATTEMPT"], "2")
+        for name in ["TASK_RUNNER_ACCESS_TOKEN", "TASK_RUNNER_ENV_JSON", "GITHUB_OUTPUT",
                      "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "GH_TOKEN"]:
             self.assertFalse(name in env, f"Unexpected worker environment key: {name}")
 
