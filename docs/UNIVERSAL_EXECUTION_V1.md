@@ -86,7 +86,10 @@ the public runner's job duration.
 
 Do not place secret values in the manifest itself. Environment bindings
 must refer to keys in TASK_RUNNER_ENV_JSON or to the opaque ID. The
-TASK_JOB_ID variable is injected automatically. GitHub Actions output-related
+TASK_JOB_ID variable is injected automatically. The executor also adds
+`TASK_RUNNER_RUN_ID` and `TASK_RUNNER_RUN_ATTEMPT` to the trusted worker
+environment as non-secret provenance. These values are set by the workflow
+host and are not manifest-overridable. GitHub Actions output-related
 environment variables and the bootstrap token are not intentionally passed
 to the child task. Private code handles its own secure results transfer
 back to a private destination. No public artifact upload is supported.
