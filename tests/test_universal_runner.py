@@ -109,7 +109,7 @@ class RunnerContractTests(unittest.TestCase):
         for name in ["TASK_RUNNER_ACCESS_TOKEN", "TASK_RUNNER_ENV_JSON",
                      "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_OUTPUT",
                      "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "GH_TOKEN"]:
-            self.assertNotIn(name, env)
+            self.assertFalse(name in env, f"Unexpected worker environment key: {name}")
 
     def test_private_manifest_download_uses_credentials_without_logging(self):
         class DummyResponse:
