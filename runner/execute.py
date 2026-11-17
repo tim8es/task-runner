@@ -240,8 +240,7 @@ def build_worker_environment(payload: dict, secret_values: dict, job_id: str,
     worker = os.environ.copy()
     for name in list(worker):
         if (name.startswith(("TASK_RUNNER_", "GIT_", "ACTIONS_ID_TOKEN_REQUEST_"))
-                or name in {"GITHUB_TOKEN", "GH_TOKEN", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT",
-                            "GITHUB_ENV", "GITHUB_PATH",
+                or name in {"GITHUB_TOKEN", "GH_TOKEN", "GITHUB_ENV", "GITHUB_PATH",
                             "GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "ACTIONS_RUNTIME_TOKEN",
                             "ACTIONS_RUNTIME_URL", "ACTIONS_CACHE_URL"}):
             worker.pop(name, None)
